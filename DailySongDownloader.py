@@ -6,6 +6,7 @@ import requests, json, re, os.path, time, urllib
 
 Login = ""
 Password = ""
+CredentialsFile = "credentials.txt"
 FilterByCurrentUser = True
 GetOnlyRecentSongs = True
 
@@ -15,6 +16,22 @@ SaveGamePath = "savegame.txt"
 TimeFormat = "%Y-%m-%dT%H:%M:%S+00:00"
 SavedDate = None
 
+
+def LoadCredentials():
+	global Login
+	global Password
+	try:
+		with open(CredentialsFile,"r") as f:
+			credentials = json.loads(f.read())
+	except:
+		print "Create credentials.txt file in JSON format with fields \"login\" and \"password\"!"
+		return False
+	Login = credentials["login"]
+	Password = credentials["password"]
+	if Login == "":
+		print "Update your credentials file with login and password!"
+		return False
+	return True
 
 class ForumClient:
 	_token = None
@@ -49,20 +66,26 @@ class ForumClient:
 		r = requests.get(self._url+"/api/posts/" + postId, headers = headers)
 		return json.loads(r.text)
 	
-	def getLinkToMusicFromPost(self, postId):
-		post = self.getPost(postId)
-		if (not GetOnlyRecentSongs) or time.strptime(post["data"]["attributes"]["time"],TimeFormat) < SavedDate:
+	def getPosts(self,postIds):
+		headers = {"Content-Type": "application/vnd.api+json", "Authorization":"Token " + self._token}
+		Ids = ",".join(postIds)
+		params = {"filter[id]":Ids}
+		r = requests.get(self._url+"/api/posts", headers = headers, params = params)
+		return json.loads(r.text)["data"]
+	
+	def getLinkToMusicFromPost(self, post):
+		if (not GetOnlyRecentSongs) or time.strptime(post["attributes"]["time"],TimeFormat) < SavedDate:
 			print "Old shit"
 			return None
 		if FilterByCurrentUser:
 			liked = False
-			for like in post["data"]["relationships"]["likes"]["data"]:
+			for like in post["relationships"]["likes"]["data"]:
 				if like["id"] == self._currentUser:
 					liked = True
 					break
-			if (not liked) and post["data"]["relationships"]["user"]["data"]["id"] != self._currentUser:
+			if (not liked) and post["relationships"]["user"]["data"]["id"] != self._currentUser:
 				return None
-		content = post["data"]["attributes"]["content"]
+		content = post["attributes"]["content"]
 		urls = re.findall('http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+',content)
 		url = ""
 		for i in reversed(range(0,len(urls))):
@@ -75,13 +98,20 @@ class ForumClient:
 		else:
 			return None
 
+if not LoadCredentials():
+	exit()
+print Login
+print Password
 client = ForumClient(Login,Password)
 dailySongMeta = client.getDailySongMeta()
 if GetOnlyRecentSongs and os.path.exists(SaveGamePath):
 	with open(SaveGamePath,"r") as f:
 		SavedDate = time.strptime(f.read(),TimeFormat)
+postIds = []
 for post in dailySongMeta["data"]["relationships"]["posts"]["data"]:
-	link = client.getLinkToMusicFromPost(post["id"])
+	postIds.append(post["id"])
+for post in client.getPosts(postIds):
+	link = client.getLinkToMusicFromPost(post)
 	if link != None:
 		r = requests.get(link)
 		print "Saving " + link
