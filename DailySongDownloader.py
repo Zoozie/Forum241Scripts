@@ -85,7 +85,7 @@ class ForumClient:
 					break
 			if (not liked) and post["relationships"]["user"]["data"]["id"] != self._currentUser:
 				return None
-		content = post["attributes"]["content"]
+		content = post["attributes"]["contentHtml"]
 		urls = re.findall('http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+',content)
 		url = ""
 		for i in reversed(range(0,len(urls))):
