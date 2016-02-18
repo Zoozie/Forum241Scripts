@@ -101,7 +101,6 @@ class ForumClient:
 if not LoadCredentials():
 	exit()
 print Login
-print Password
 client = ForumClient(Login,Password)
 dailySongMeta = client.getDailySongMeta()
 if GetOnlyRecentSongs and os.path.exists(SaveGamePath):
