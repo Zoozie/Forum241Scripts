@@ -64,6 +64,10 @@ class ForumClient:
         r = requests.get(self._url + "/api/discussions/15", headers=self._get_headers())
         return json.loads(r.text)
 
+    def get_daily_boobs_meta(self):
+        r = requests.get(self._url + "/api/discussions/4", headers=self._get_headers())
+        return json.loads(r.text)
+
     def get_post(self, post_id):
         r = requests.get(self._url + "/api/posts/" + post_id, headers=self._get_headers())
         return json.loads(r.text)
@@ -98,6 +102,11 @@ class ForumClient:
         else:
             return None
 
+    def get_link_to_boobs_from_post(self, post):
+        content = post["attributes"]["content"]
+        urls = re.findall('\!\[\w*\]\((.+)\)', content)
+        return urls
+
     def set_saved_date(self, saved_date):
         self._savedDate = saved_date
 
@@ -115,6 +124,36 @@ def print_args():
         changes = ' not'
     print 'Will' + changes + ' get only recent songs'
 
+
+def get_boobs():
+    credentials = load_credentials()
+    if credentials is None:
+        exit()
+    print "Logged in as: " + credentials.login
+    client = ForumClient(credentials.login, credentials.password)
+    daily_boobs_meta = client.get_daily_boobs_meta()
+    post_ids = []
+    for post in daily_boobs_meta["data"]["relationships"]["posts"]["data"]:
+        post_ids.append(post["id"])
+    post_ids.reverse()
+    print "Found " + str(len(post_ids)) + " posts"
+
+    #prepare boobs folder
+    if not os.path.exists("boobs"):
+        os.makedirs("boobs")
+
+    # Downloading each boob
+    for post in client.get_posts(post_ids):
+        _boobs = client.get_link_to_boobs_from_post(post)
+        for boob in _boobs:
+            try:
+                r = requests.get(boob)
+                print "Saving " + boob
+                with open("boobs/" + urllib.unquote(boob.split("/")[-1]), 'wb') as fd:
+                    for chunk in r.iter_content(256):
+                        fd.write(chunk)
+            except:
+                print "Failed to save boob: " + boob
 
 def main():
     global FilterByCurrentUser, GetOnlyRecentSongs
